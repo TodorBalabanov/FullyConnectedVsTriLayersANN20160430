@@ -355,7 +355,7 @@ public class Main {
 		return error;
 	}
 
-	private static double testing(double activities[][]) {
+	private static double testing(double activities[][], double weights[][]) {
 		double error = 0.0;
 
 		double output[] = new double[LEAD_FRAME_SIZE];
