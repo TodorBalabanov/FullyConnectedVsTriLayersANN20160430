@@ -1,7 +1,65 @@
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+
+import org.apache.commons.math3.genetics.AbstractListChromosome;
+import org.apache.commons.math3.genetics.Chromosome;
+import org.apache.commons.math3.genetics.GeneticAlgorithm;
+import org.apache.commons.math3.genetics.InvalidRepresentationException;
+import org.apache.commons.math3.genetics.MutationPolicy;
 
 public class Main {
+	private static class Weights {
+		double values[][] = new double[0][0];
+	}
+
+	private static class WeightsListChromosome extends AbstractListChromosome<Weights> {
+
+		public WeightsListChromosome(Weights[] representation) throws InvalidRepresentationException {
+			super(representation);
+		}
+
+		public WeightsListChromosome(List<Weights> representation) throws InvalidRepresentationException {
+			super(representation);
+		}
+
+		public WeightsListChromosome(List<Weights> representation, boolean copy) throws InvalidRepresentationException {
+			super(representation, copy);
+		}
+
+		public WeightsListChromosome(Chromosome original) {
+			super(null, false);
+		}
+
+		@Override
+		public double fitness() {
+			// TODO Calculate cumulative ANN error.
+			return 0;
+		}
+
+		@Override
+		protected void checkValidity(List<Weights> list) throws InvalidRepresentationException {
+		}
+
+		@Override
+		public WeightsListChromosome newFixedLengthChromosome(List<Weights> list) {
+			return null;
+		}
+	}
+
+	private static class RandomWeightsMutation implements MutationPolicy {
+		public Chromosome mutate(Chromosome original) {
+			if (!(original instanceof WeightsListChromosome)) {
+				throw new IllegalArgumentException();
+			}
+
+			WeightsListChromosome mutated = new WeightsListChromosome( original );
+
+			return mutated;
+		}
+	}
+
 	private static final int LAG_FRAME_SIZE = 28;
 
 	private static final int HIDDEN_LAYER_SIZE = 12;
