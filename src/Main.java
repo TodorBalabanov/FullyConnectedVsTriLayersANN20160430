@@ -45,7 +45,8 @@ public class Main {
 
 		@Override
 		public WeightsListChromosome newFixedLengthChromosome(List<Double> list) {
-			return null;
+			// TODO Make a deep copy.
+			return new WeightsListChromosome(list, true);
 		}
 
 		public List<Double> getDoubleRepresentation() {
@@ -54,6 +55,7 @@ public class Main {
 	}
 
 	private static class RandomWeightsMutation implements MutationPolicy {
+		@Override
 		public Chromosome mutate(Chromosome original) {
 			if (!(original instanceof WeightsListChromosome)) {
 				throw new IllegalArgumentException();
@@ -403,7 +405,7 @@ public class Main {
 		for (int j = 0; j < result.length; j++) {
 			result[j] = 0;
 			for (int i = 0; i < neurons.length; i++) {
-				result[j] += activities[i][j] * weights.get(i * TOTAL_NUMBER_OF_NEURONS * j);
+				result[j] += activities[i][j] * weights.get(i * TOTAL_NUMBER_OF_NEURONS + j);
 			}
 
 			/*
@@ -425,8 +427,9 @@ public class Main {
 	private static double training(List<Double> weights) {
 		double error = 0.0;
 
+		int length = Math.min(trainingInputSet.length, trainingExpectedSet.length);
 		double output[] = new double[LEAD_FRAME_SIZE];
-		for (int e = 0; e < training.length; e++) {
+		for (int e = 0; e < length; e++) {
 			System.arraycopy(trainingInputSet[e], 0, neurons, BIAS_INDEX[0] + 1, trainingInputSet[e].length);
 			neurons = feedforward(neurons, activities, weights);
 			System.arraycopy(neurons, BIAS_INDEX[2] + 1, output, 0, output.length);
@@ -440,8 +443,9 @@ public class Main {
 	private static double testing(List<Double> weights) {
 		double error = 0.0;
 
+		int length = Math.min(testingInputSet.length, testingExpectedSet.length);
 		double output[] = new double[LEAD_FRAME_SIZE];
-		for (int e = 0; e < testing.length; e++) {
+		for (int e = 0; e < length; e++) {
 			System.arraycopy(testingInputSet[e], 0, neurons, BIAS_INDEX[0] + 1, testingInputSet[e].length);
 			neurons = feedforward(neurons, activities, weights);
 			System.arraycopy(neurons, BIAS_INDEX[2] + 1, output, 0, output.length);
@@ -508,5 +512,4 @@ public class Main {
 		System.out.println("Report:\t");
 		System.out.println(report());
 	}
-
 }
