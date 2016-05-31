@@ -1,50 +1,55 @@
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Random;
 
 import org.apache.commons.math3.genetics.AbstractListChromosome;
 import org.apache.commons.math3.genetics.Chromosome;
+import org.apache.commons.math3.genetics.ElitisticListPopulation;
+import org.apache.commons.math3.genetics.FixedElapsedTime;
 import org.apache.commons.math3.genetics.GeneticAlgorithm;
 import org.apache.commons.math3.genetics.InvalidRepresentationException;
 import org.apache.commons.math3.genetics.MutationPolicy;
+import org.apache.commons.math3.genetics.Population;
+import org.apache.commons.math3.genetics.TournamentSelection;
+import org.apache.commons.math3.genetics.UniformCrossover;
 
 public class Main {
-	private static class Weights {
-		double values[][] = new double[0][0];
-	}
+	private static class WeightsListChromosome extends AbstractListChromosome<Double> {
 
-	private static class WeightsListChromosome extends AbstractListChromosome<Weights> {
-
-		public WeightsListChromosome(Weights[] representation) throws InvalidRepresentationException {
+		public WeightsListChromosome(Double[] representation) throws InvalidRepresentationException {
 			super(representation);
 		}
 
-		public WeightsListChromosome(List<Weights> representation) throws InvalidRepresentationException {
+		public WeightsListChromosome(List<Double> representation) throws InvalidRepresentationException {
 			super(representation);
 		}
 
-		public WeightsListChromosome(List<Weights> representation, boolean copy) throws InvalidRepresentationException {
+		public WeightsListChromosome(List<Double> representation, boolean copy) throws InvalidRepresentationException {
 			super(representation, copy);
-		}
-
-		public WeightsListChromosome(Chromosome original) {
-			super(null, false);
 		}
 
 		@Override
 		public double fitness() {
-			// TODO Calculate cumulative ANN error.
-			return 0;
+			/*
+			 * Calculate cumulative ANN error.
+			 */
+			return training(getDoubleRepresentation());
 		}
 
 		@Override
-		protected void checkValidity(List<Weights> list) throws InvalidRepresentationException {
+		protected void checkValidity(List<Double> list) throws InvalidRepresentationException {
 		}
 
 		@Override
-		public WeightsListChromosome newFixedLengthChromosome(List<Weights> list) {
+		public WeightsListChromosome newFixedLengthChromosome(List<Double> list) {
 			return null;
+		}
+
+		public List<Double> getDoubleRepresentation() {
+			return getRepresentation();
 		}
 	}
 
@@ -54,11 +59,28 @@ public class Main {
 				throw new IllegalArgumentException();
 			}
 
-			WeightsListChromosome mutated = new WeightsListChromosome( original );
+			List<Double> values = new ArrayList<Double>();
+			for (Double value : ((WeightsListChromosome) original).getDoubleRepresentation()) {
+				values.add(value + PRNG.nextDouble() * 2.0D * MUTATION_EPSILON - MUTATION_EPSILON);
+			}
 
-			return mutated;
+			return new WeightsListChromosome(values);
 		}
 	}
+
+	private static Random PRNG = new Random();
+
+	private static final int POPULATION_SIZE = 37;
+
+	private static final double CROSSOVER_RATE = 0.9;
+
+	private static final double MUTATION_RATE = 0.03;
+
+	private static final double MUTATION_EPSILON = 0.01;
+
+	private static final double ELITISM_RATE = 0.1;
+
+	private static final int TOURNAMENT_ARITY = 2;
 
 	private static final int LAG_FRAME_SIZE = 28;
 
@@ -66,11 +88,18 @@ public class Main {
 
 	private static final int LEAD_FRAME_SIZE = 5;
 
+	/**
+	 * Plus one for the bias neurons.
+	 */
+	private static final int TOTAL_NUMBER_OF_NEURONS = LAG_FRAME_SIZE + 1 + HIDDEN_LAYER_SIZE + 1 + LEAD_FRAME_SIZE + 1;
+
+	private static final int TOTAL_NUMBER_OF_WEIGHTS = TOTAL_NUMBER_OF_NEURONS * TOTAL_NUMBER_OF_NEURONS;
+
 	private static final Integer BIAS_INDEX[] = { 0, 29, 42 };
 
 	private static final double TRAINING_STOP_ERROR = 0.0001;
 
-	private static final long TRAINING_TIMEOUT = 1000 * 60 * 60 * 24;
+	private static final long TRAINING_TIMEOUT_SECONDS = 60 * 60 * 24;
 
 	private static final Integer TIME_SERIES[] = { 3938, 1317, 4021, 10477, 9379, 7707, 9507, 4194, 2681, 3522, 5599,
 			5641, 6737, 7781, 2044, 1501, 6586, 4915, 5918, 6132, 9394, 2113, 935, 9729, 5236, 8815, 3169, 5888, 5722,
@@ -151,14 +180,9 @@ public class Main {
 		}
 	}
 
-	/**
-	 * Plus one for the bias neurons.
-	 */
-	private static double neurons[] = new double[LAG_FRAME_SIZE + 1 + HIDDEN_LAYER_SIZE + 1 + LEAD_FRAME_SIZE + 1];
+	private static double neurons[] = new double[TOTAL_NUMBER_OF_NEURONS];
 
 	private static double activities[][] = new double[0][0];
-
-	private static double weights[][] = new double[0][0];
 
 	private static double FULLY_CONNECTED_ACTIVITIES[][] = {
 			{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1,
@@ -364,7 +388,7 @@ public class Main {
 		return Math.sqrt(value);
 	}
 
-	private static double[] feedforward(double neurons[], double activities[][], double weights[][]) {
+	private static double[] feedforward(double neurons[], double activities[][], List<Double> weights) {
 		/*
 		 * Bias neurons should not change their basic value.
 		 */
@@ -379,7 +403,7 @@ public class Main {
 		for (int j = 0; j < result.length; j++) {
 			result[j] = 0;
 			for (int i = 0; i < neurons.length; i++) {
-				result[j] += activities[i][j] * weights[i][j];
+				result[j] += activities[i][j] * weights.get(i * TOTAL_NUMBER_OF_NEURONS * j);
 			}
 
 			/*
@@ -398,7 +422,7 @@ public class Main {
 		return result;
 	}
 
-	private static double training(double activities[][], double weights[][]) {
+	private static double training(List<Double> weights) {
 		double error = 0.0;
 
 		double output[] = new double[LEAD_FRAME_SIZE];
@@ -413,7 +437,7 @@ public class Main {
 		return error;
 	}
 
-	private static double testing(double activities[][], double weights[][]) {
+	private static double testing(List<Double> weights) {
 		double error = 0.0;
 
 		double output[] = new double[LEAD_FRAME_SIZE];
@@ -428,6 +452,61 @@ public class Main {
 		return error;
 	}
 
-	public static void main(String[] args) {
+	private static List<Double> randomRepresentation(int length) {
+		List<Double> random = new ArrayList<Double>();
+
+		for (int i = 0; i < length; i++) {
+			// TODO Add initial interval.
+			random.add(PRNG.nextDouble());
+		}
+
+		return random;
 	}
+
+	private static Population randomInitialPopulation() {
+		List<Chromosome> list = new LinkedList<Chromosome>();
+		for (int i = 0; i < POPULATION_SIZE; i++) {
+			list.add(new WeightsListChromosome(randomRepresentation(TOTAL_NUMBER_OF_WEIGHTS)));
+		}
+		return new ElitisticListPopulation(list, 2 * list.size(), ELITISM_RATE);
+	}
+
+	private static String report() {
+		return "[POPULATION_SIZE=" + POPULATION_SIZE + ", CROSSOVER_RATE=" + CROSSOVER_RATE + ", MUTATION_RATE="
+				+ MUTATION_RATE + ", MUTATION_EPSILON=" + MUTATION_EPSILON + ", ELITISM_RATE=" + ELITISM_RATE
+				+ ", TOURNAMENT_ARITY=" + TOURNAMENT_ARITY + ", LAG_FRAME_SIZE=" + LAG_FRAME_SIZE
+				+ ", HIDDEN_LAYER_SIZE=" + HIDDEN_LAYER_SIZE + ", LEAD_FRAME_SIZE=" + LEAD_FRAME_SIZE
+				+ ", TOTAL_NUMBER_OF_NEURONS=" + TOTAL_NUMBER_OF_NEURONS + ", TOTAL_NUMBER_OF_WEIGHTS="
+				+ TOTAL_NUMBER_OF_WEIGHTS + ", BIAS_INDEX=" + Arrays.toString(BIAS_INDEX) + ", TRAINING_STOP_ERROR="
+				+ TRAINING_STOP_ERROR + ", TRAINING_TIMEOUT_SECONDS=" + TRAINING_TIMEOUT_SECONDS + "]";
+	}
+
+	public static void main(String[] args) {
+		Population initial = null;
+		Population optimized = null;
+		WeightsListChromosome best = null;
+
+		initial = randomInitialPopulation();
+		GeneticAlgorithm ga = new GeneticAlgorithm(new UniformCrossover<Double>(0.5), CROSSOVER_RATE,
+				new RandomWeightsMutation(), MUTATION_RATE, new TournamentSelection(TOURNAMENT_ARITY));
+
+		activities = TRI_LAYERS_ACTIVITIES;
+		optimized = ga.evolve(initial, new FixedElapsedTime(TRAINING_TIMEOUT_SECONDS));
+		best = (WeightsListChromosome) optimized.getFittestChromosome();
+		System.out.println("Generations Number:\t" + ga.getGenerationsEvolved());
+		System.out.println("Best Fitness:\t" + best.getFitness());
+		System.out.println("Network Error:\t" + testing(best.getDoubleRepresentation()));
+		System.out.println("Report:\t");
+		System.out.println(report());
+
+		activities = FULLY_CONNECTED_ACTIVITIES;
+		optimized = ga.evolve(initial, new FixedElapsedTime(TRAINING_TIMEOUT_SECONDS));
+		best = (WeightsListChromosome) optimized.getFittestChromosome();
+		System.out.println("Generations Number:\t" + ga.getGenerationsEvolved());
+		System.out.println("Best Fitness:\t" + best.getFitness());
+		System.out.println("Network Error:\t" + testing(best.getDoubleRepresentation()));
+		System.out.println("Report:\t");
+		System.out.println(report());
+	}
+
 }
